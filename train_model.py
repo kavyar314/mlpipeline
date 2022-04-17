@@ -1,18 +1,32 @@
-import argparse, os, importlib
+import argparse, os, importlib, datetime
+import numpy as np
 
 import dataload
 import losses
 import utils
 import models
+import optimizers
 
 import torch
 
 PATH_TO_CONFIG = './'
 VERBOSE = True
+n_samples = 100
 
 
 def train_loop(dataloader, model, loss, optimizer, n_epochs, print_freq=1):
-	for i in n_epochs:
+	'''
+	training loop function trains model on data using loss and optimizer as specified for the desired number of epochs
+
+	Arguments
+	dataloader: type pytorch DataLoader containing the data on which to be trained
+	model: type pytorch Module containing architecture and parameters
+	loss: pytorch Module with loss function implemented
+	optimizer: pytorch Optimizer capable of optimizer.step() to update model parameters
+	n_epochs: number of epochs for which to train
+	print_freq: how often to log the loss.
+	'''
+	for i in range(n_epochs):
 		print("training: epoch %d" % i)
 		epoch_loss = 0
 
@@ -26,15 +40,31 @@ def train_loop(dataloader, model, loss, optimizer, n_epochs, print_freq=1):
 			loss_val = loss_param.item() * X.shape[0]
 			epoch_loss += loss_val
 		avg_epoch_loss = epoch_loss / len(dataloader.dataset)
+		print(f"training loss at epoch {i}: {avg_epoch_loss}")
 
+def eval_model(dataloader, model, loss):
+	correct = 0
+	total_test_loss = 0
+	total = 0
+	for (X, y) in dataloader:
+		preds = model(X)
+		test_loss = loss(preds, y).item()
+		total_test_loss += test_loss*X.shape[0]
+		correct += (preds.argmax(1) == y).sum().item()
+		total += X.shape[0]
+	score = correct/total
+	avg_test_loss = total_test_loss/total
+	print(f"score: {score},\t average test loss: {avg_test_loss}")
+	return score, avg_test_loss
 
-def save_model(model, model_name, model_args, path):
-	save_dict = {"model constructor": model_name,
-				 "model arguments": model_args,
-				 "parameters": model.get_parameters()}
-	timestamp = str(datetime.datetime.now())
-	save_name = f"{model_name}_{timestamp}.npy"
-	np.save(os.path.join(path, save_name), save_dict)
+def save_model(model, model_name, dataset, model_args, path):
+	## might make sense to save the model just using pytorch presets and then have a separate condition for the VJ with Boosting
+	if model_name == "VJ":
+		print("not implemented yet...")
+	else:
+		timestamp = str(datetime.datetime.now())
+		save_name = f"{model_name}_{dataset}_{timestamp}.npy"
+		torch.save(model, os.path.join(path, save_name))
 
 def load_model(path):
 	model_dict = np.load(path)
@@ -60,7 +90,7 @@ if __name__ == '__main__':
 	if VERBOSE:
 		print("loading config....")
 
-	spec = importlib.util.spec_from_file_location(args.config, PATH_TO_CONFIG)
+	spec = importlib.util.spec_from_file_location(args.config, os.path.join(PATH_TO_CONFIG, args.config))
 	configpy = importlib.util.module_from_spec(spec)
 	spec.loader.exec_module(configpy)
 	batch_size = configpy.batch_size
@@ -70,8 +100,8 @@ if __name__ == '__main__':
 	n_epochs = configpy.n_epochs
 	save_path = configpy.save_path
 
-	if not os.isdir(save_path):
-		os.mkdirs(save_path)
+	if not os.path.isdir(save_path):
+		os.makedirs(save_path)
 
 	try:
 		preproc = configpy.preproc
@@ -86,10 +116,10 @@ if __name__ == '__main__':
 
 		if VERBOSE:
 			print("handling non-VJ case....")
-			print("making train/test split")
+			print("making train/test split\n\n")
 
 		# make train / test split
-		train_files, test_files = utils.train_test_split(args.data)
+		train_files, test_files = utils.train_test_split(args.data, n_samples)
 
 		## todo: implement class that extends Dataset so can use in DataLoader
 		train_dataset = dataload.load_data_from_path(args.data, preproc, train_files)
@@ -103,11 +133,11 @@ if __name__ == '__main__':
 
 		model = models.model_selector(args.model, model_args)
 
-		optimizer = optimizers.optimizer_selection(args.optimizer, optimizer_args)(model.parameters()) 
+		optimizer = optimizers.optimizer_selector(args.optimizer, optimizer_args)(model.parameters()) 
 
 		if VERBOSE:
 			print("instantiated dataloader, loss, model, optimizer...")
-			print("beginning training...")
+			print("beginning training...\n\n")
 		# signature of that which is returned by optimizer_selection is takes in model parameters and has the same interface as optim.SGD
 
 		train_loop(trainloader, model, loss, optimizer, n_epochs)
@@ -115,9 +145,11 @@ if __name__ == '__main__':
 		if VERBOSE:
 			print("training complete...")
 
-		score = eval_model(testloader, model)
+		score, test_loss = eval_model(testloader, model, loss)
 
-		save_model(model, save_path)
+		dataset_name = args.data.split('/')[-1]
+
+		save_model(model, args.model, dataset_name, model_args, save_path)
 
 
 
