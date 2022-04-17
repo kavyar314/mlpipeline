@@ -3,9 +3,10 @@
 ## data
 
 * top-level directory has the name of the dataset
-** each sub-directory matches the name of a class
-*** files of images from that class are inside the subdirectory
+    * each sub-directory matches the name of a class
+        * files of images from that class are inside the subdirectory
 
+```
 dataset_name
 	|__ class1
 	    |__ img1.jpg
@@ -20,3 +21,4 @@ dataset_name
 	    |__ img2.jpg
 	    |__ ...
 	|__ ...
+```
