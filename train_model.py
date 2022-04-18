@@ -42,6 +42,12 @@ def train_loop(dataloader, model, loss, optimizer, n_epochs, print_freq=1):
 		avg_epoch_loss = epoch_loss / len(dataloader.dataset)
 		print(f"training loss at epoch {i}: {avg_epoch_loss}")
 
+def custom_train_loop(dataloader, model, loss, optimizer, n_epochs, print_freq=1):
+	# runs with a while loop -- add a "terminate" flag in optimizer and check it each time
+	while optimizer.terminated is not True:
+		# take actions
+	pass
+
 def eval_model(dataloader, model, loss):
 	correct = 0
 	total_test_loss = 0
@@ -110,6 +116,11 @@ if __name__ == '__main__':
 
 	if args.preproc == "VJ" and args.optimizer == "Boosting":
 		## handle this case separately
+		# load data into files
+		# compute the integral images
+		# run Boosting with V-J weak classifiers
+		# score on test set
+		# save model
 		print("unimplemented")
 
 	else:
@@ -130,17 +141,18 @@ if __name__ == '__main__':
 		testloader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
 		loss = losses.loss_selector(args.loss, loss_args)
-
 		model = models.model_selector(args.model, model_args)
-
 		optimizer = optimizers.optimizer_selector(args.optimizer, optimizer_args)(model.parameters()) 
 
 		if VERBOSE:
 			print("instantiated dataloader, loss, model, optimizer...")
 			print("beginning training...\n\n")
-		# signature of that which is returned by optimizer_selection is takes in model parameters and has the same interface as optim.SGD
 
-		train_loop(trainloader, model, loss, optimizer, n_epochs)
+		if "torch" in args.optimizer:
+			# signature of that which is returned by optimizer_selection is takes in model parameters and has the same interface as optim.SGD
+			train_loop(trainloader, model, loss, optimizer, n_epochs)
+		else:
+			custom_train_loop(trainloader, model, loss, optimizer, n_epochs)
 
 		if VERBOSE:
 			print("training complete...")
