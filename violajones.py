@@ -131,3 +131,53 @@ def find_and_score_threshold(class_1, class_2, wt_pos, wt_neg):
     scored_ts = [score(t) for t in potential_ts]
     i = np.argmax(scored_ts)
     return potential_ts[i], scored_ts[i]
+
+
+def extract_rights_wrongs(boosted_clf, processed_X_test, X_test, y_test, idx=None):
+    '''
+    could either have this fn only handle the weak classifiers, or just write 
+    one fn with idx as an optional arg, and if it is not received, it will just run clf.predict
+    
+    takes in processed Xs for inference but also raw Xs to output
+    '''
+    if idx is not None:
+        clf = boosted_clf.learned_clfs[idx]
+    else:
+        clf = boosted_clf
+    pred = clf.predict(processed_X_test)
+    wrong_idxs = np.where(np.not_equal(pred, y_test))[0]
+    right_idxs = np.where(np.equal(pred, y_test))[0]
+    class_1_incorrect = [X_test[i] for i in wrong_idxs if y_test[i]==1]
+    class_0_incorrect = [X_test[i] for i in wrong_idxs if y_test[i]==-1]
+    class_1_correct = [X_test[i] for i in right_idxs if y_test[i]==1]
+    class_0_correct = [X_test[i] for i in right_idxs if y_test[i]==-1]
+    return class_1_incorrect, class_0_incorrect, class_1_correct, class_0_correct
+
+
+def plot_confusion_grid(wrong_faces, wrong_notfaces, right_faces, right_notfaces, title_string):
+    f, axarr = plt.subplots(5,7, figsize=(14,10))#, gridspec_kw={'hspace': 0.1})
+    f.tight_layout()
+    for i in tqdm(range(5)):
+        for j in range(7):
+            try:
+                if j < 3:
+                    if i < 2:
+                        axarr[i,j].imshow(wrong_faces[i*3 + j])# , aspect = "auto")
+                    if i > 2:
+                        axarr[i, j].imshow(wrong_notfaces[(i-3)*3 + j])
+                elif j == 3:
+                    axarr[i,j].imshow(np.ones((2,2,3)))# , aspect = "auto")
+                elif j > 3:
+                    if i < 2:
+                        axarr[i,j].imshow(right_faces[i*3 + j-4])
+                    if i > 2:
+                        axarr[i,j].imshow(right_notfaces[(i-3)*3 + j - 4])
+            except:
+                axarr[i,j].imshow(np.ones((2,2,3)))
+            axarr[i,j].axis('off')
+    f.subplots_adjust(hspace=0.0, wspace=0.0)#, right=0.7)
+    
+    f.suptitle(title_string, y=1.02, size=20)
+    axarr[0,1].set_title("GOT WRONG", size=16)
+    axarr[0,5].set_title("GOT RIGHT", size=16)
+    plt.show()
