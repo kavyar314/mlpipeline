@@ -44,9 +44,21 @@ def train_loop(dataloader, model, loss, optimizer, n_epochs, print_freq=1):
 
 def custom_train_loop(dataloader, model, loss, optimizer, n_epochs, print_freq=1):
 	# runs with a while loop -- add a "terminate" flag in optimizer and check it each time
-	while optimizer.terminated is not True:
+	while optimizer.has_terminated() is not True:
+		print("training: epoch %d" % i)
+		epoch_loss = 0
 		# take actions
-	pass
+		for (X,y) in dataloader:
+			preds = model(X)
+			loss_param = loss(preds, y)
+			
+			loss_param.backward()
+			optimizer.step()
+
+			loss_val = loss_param.item() * X.shape[0]
+			epoch_loss += loss_val
+		avg_epoch_loss = epoch_loss / len(dataloader.dataset)
+		print(f"training loss at epoch {i}: {avg_epoch_loss}")
 
 def eval_model(dataloader, model, loss):
 	correct = 0
