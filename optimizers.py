@@ -22,10 +22,44 @@ class LoggedGradientDescent(optim.Optimizer, OptimizerTermination, Logs):
 		self.termination_function = self.termination_selector(termination[0])
 		self.terminal_value = termination[1]
 		self.logs = [self.logs_selector(log_name) for log_name in log_names]
-		self.terminated = False
+		self.terminated = False ## is it better to have an instance field for this or a function that calls the termination_function when called?
 
-	def step(self):
-		pass
+	def step(self, closure):
+		loss = None
+
+		if closure is not None:
+			with torch.enable_grad():
+				loss = closure()
+
+		# does not step if termination condition has been met
+		if self.termination_function(self.terminal_value):
+			self.terminated = True
+			return loss
+
+		for g in self.param_groups:
+			params_with_grad = []
+			d_params = []
+			has_sparse_gradient = False
+
+			for param in g['params']:
+				if param.grad is not None:
+					params_with_grad.append(param)
+					d_params.append(param.grad)
+					if param.grad_is_sparse:
+						has_sparse_gradient = True
+
+			gd(params_with_grad, d_params, lr=g["lr"], has_sparse_gradient=has_sparse_gradient)
+
+		return loss
+
+	def gd(params, d_params, lr, has_sparse_gradient):
+		# first, don't implement foreach version
+		for i, p in enumerate(params):
+			p.add_(d_params[i], -lr[i]) 
+
+
+	def has_terminated(self):
+		return self.termination_function()
 
 	def termination_selector(self, termination_name):
 		'''
@@ -86,6 +120,9 @@ class Logs(OptimizerInstanceFields):
 		self.plot = plot
 
 	def log_item(self, itemfn):
+		pass
+
+	def save_log_state(self, path_to_save):
 		pass
 
 
