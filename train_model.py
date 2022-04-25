@@ -44,7 +44,7 @@ def train_loop(dataloader, model, loss, optimizer, n_epochs, print_freq=1):
 
 def custom_train_loop(dataloader, model, loss, optimizer, n_epochs, print_freq=1):
 	# runs with a while loop -- add a "terminate" flag in optimizer and check it each time
-	while optimizer.has_terminated() is not True:
+	while optimizer.terminated is false:
 		print("training: epoch %d" % i)
 		epoch_loss = 0
 		# take actions
