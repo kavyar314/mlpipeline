@@ -1,5 +1,6 @@
 
 import os, random
+import numpy as np
 
 EXCLUDE = ['.DS_Store']
 
