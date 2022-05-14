@@ -6,6 +6,7 @@ import losses
 import utils
 import models
 import optimizers
+import violajones
 
 import torch
 
@@ -16,15 +17,16 @@ n_samples = 100
 
 def train_loop(dataloader, model, loss, optimizer, n_epochs, print_freq=1):
 	'''
-	training loop function trains model on data using loss and optimizer as specified for the desired number of epochs
+	training loop function trains model for a specified number of epochs on data 
+	using loss and optimizer as specified
 
-	Arguments
-	dataloader: type pytorch DataLoader containing the data on which to be trained
-	model: type pytorch Module containing architecture and parameters
-	loss: pytorch Module with loss function implemented
-	optimizer: pytorch Optimizer capable of optimizer.step() to update model parameters
-	n_epochs: number of epochs for which to train
-	print_freq: how often to log the loss.
+	Arguments:
+		dataloader: type pytorch DataLoader containing the data on which to be trained
+		model: type pytorch Module containing architecture and parameters
+		loss: pytorch Module with loss function implemented
+		optimizer: pytorch Optimizer capable of optimizer.step() to update model parameters
+		n_epochs: number of epochs for which to train
+		print_freq: how often to log the loss.
 	'''
 	for i in range(n_epochs):
 		print("training: epoch %d" % i)
@@ -42,7 +44,18 @@ def train_loop(dataloader, model, loss, optimizer, n_epochs, print_freq=1):
 		avg_epoch_loss = epoch_loss / len(dataloader.dataset)
 		print(f"training loss at epoch {i}: {avg_epoch_loss}")
 
-def custom_train_loop(dataloader, model, loss, optimizer, n_epochs, print_freq=1):
+def custom_train_loop(dataloader, model, loss, optimizer, print_freq=1):
+	'''
+	custom train loop trains a model with a custom termination condition in terms of the 
+	optimization. Optimizer termination condition can be set through "optimizer args" in the selector function
+
+	Arguments:
+		dataloader: type pytorch DataLoader containing the data on which to be trained
+		model: type pytorch Module containing architecture and parameters
+		loss: pytorch Module with loss function implemented
+		optimizer: pytorch Optimizer capable of optimizer.step() to update model parameters
+		print_freq: how often to log the loss.
+	'''
 	# runs with a while loop -- add a "terminate" flag in optimizer and check it each time
 	while optimizer.terminated is false:
 		print("training: epoch %d" % i)
@@ -61,6 +74,14 @@ def custom_train_loop(dataloader, model, loss, optimizer, n_epochs, print_freq=1
 		print(f"training loss at epoch {i}: {avg_epoch_loss}")
 
 def eval_model(dataloader, model, loss):
+	'''
+	evaluates model on a test dataset and returns the score (0-1 loss) and the average test loss for the given loss function
+
+	Arguments:
+		dataloader: type pytorch DataLoader containing the data on which to be tested
+		model: type pytorch Module containing architecture and parameters
+		loss:  
+	'''
 	correct = 0
 	total_test_loss = 0
 	total = 0
@@ -77,11 +98,13 @@ def eval_model(dataloader, model, loss):
 
 def save_model(model, model_name, dataset, model_args, path):
 	## might make sense to save the model just using pytorch presets and then have a separate condition for the VJ with Boosting
+	timestamp = str(datetime.datetime.now())
+	save_name = f"{model_name}_{dataset}_{timestamp}.npy"
 	if model_name == "VJ":
-		print("not implemented yet...")
+		# print("not implemented yet...")
+		save_dict = model.get_save_attributes()
+		np.save(save_name, save_dict)
 	else:
-		timestamp = str(datetime.datetime.now())
-		save_name = f"{model_name}_{dataset}_{timestamp}.npy"
 		torch.save(model, os.path.join(path, save_name))
 
 def load_model(path):
@@ -126,6 +149,16 @@ if __name__ == '__main__':
 	except:
 		preproc = None
 
+	try:
+		img_dim = configpy.img_dim
+	except:
+		img_dim = None
+
+	try:
+		n_learners = configpy.n_learners
+	except:
+		n_learners = None
+
 	if args.preproc == "VJ" and args.optimizer == "Boosting":
 		## handle this case separately
 		# load data into files
@@ -133,7 +166,30 @@ if __name__ == '__main__':
 		# run Boosting with V-J weak classifiers
 		# score on test set
 		# save model
-		print("unimplemented")
+		if not (os.path.isdir("./vj-data/faces") and os.path.isdir("./vj-data/not_faces")):
+			print("data not available")
+			return
+		if img_dim is None or n_learners is None:
+			print("use config that allows for V-J")
+			return
+		train_files, test_files = utils.train_test_split(args.data, n_sampes, include_classes=True)
+		X_train, y_train = utils.load_specified_files_from_path(args.data, train_files, img_dim=img_dim)
+		X_test, y_test = utils.load_specified_files_from_path(args.data, test_files, img_dim=img_dim)
+		# testloader = dataload.load_data_from_path(args.data, preproc, test_files)
+
+		phi_X = violajones.compute_integral_img(X_train)
+
+		boosted_clf_vj = AdaBoost(violajones.V_J_weak, n_learners=n_learners)
+		boosted_clf_vj.fit(phi_X, y_train)
+
+		test_phi_X = compute_integral_img(X_test)
+
+		yvj_test_predict = boosted_clf_vj.predict(test_phi_X)
+		# eval_model() can I use this here somehow?
+		# todo: compute test error, save model
+		test_accuracy = np.mean(y_test == yvj_test_predict)
+
+		save_model(model, args.model, dataset_name, model_args, save_path)
 
 	else:
 
@@ -164,7 +220,7 @@ if __name__ == '__main__':
 			# signature of that which is returned by optimizer_selection is takes in model parameters and has the same interface as optim.SGD
 			train_loop(trainloader, model, loss, optimizer, n_epochs)
 		else:
-			custom_train_loop(trainloader, model, loss, optimizer, n_epochs)
+			custom_train_loop(trainloader, model, loss, optimizer)
 
 		if VERBOSE:
 			print("training complete...")
