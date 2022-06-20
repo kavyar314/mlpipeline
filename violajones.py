@@ -1,5 +1,21 @@
 # Next two classes adapted from https://github.com/salvacarrion/viola-jones
 class Rectangle:
+    '''
+    rectangle class -- can compute the value of that rectangle 
+    superimposed onto integral images based on the x, y coordinate 
+    it should be placed at and width and height
+
+
+    Attributes:
+        x: x coordinate of placement of rectangle
+        y: y coordinate of placement of rectangle
+        w: width of rectangle (added to the right of the given x coordinate)
+        h: height of rectangle (added below the given y coordinate)
+    
+    Methods:
+        compute_area(integral_img)
+            Computes the area inside the given rectangle using the integral image
+    '''
     def __init__(self, x, y, w, h):
         self.x = x
         self.y = y
@@ -9,6 +25,8 @@ class Rectangle:
     def compute_area(self, integral_img):
         '''
         integral_img is (n, dim, dim)
+
+        may wish to check all locations for being within bounds?
         '''
         a = (self.x-1, self.y-1)
         b = (self.x+self.w-1, self.y)
@@ -21,18 +39,38 @@ class Rectangle:
         return integral_img[:,d[1], d[0]] - integral_img[:,b[1], b[0]] - integral_img[:,c[1], c[0]] + integral_img[:,a[1], a[0]]
     
 class HaarFeature:
+    '''
+    class that computes a Haar Feature
+
+    Attributes:
+        positives: rectangles whose pixels should be added to the final value
+        negatives: rectangles whose pixels should be subtracted from the final value
+    
+    Methods:
+        compute_value: computes the value of that feature in the passed in integral image
+    '''
     def __init__(self, pos, neg):
         self.positives = pos
         self.negatives = neg
     
     def compute_value(self, integral_img):
+        '''
+        computes value of the feature on the integral img passed in
+
+        Argument:
+            integral_img: an array consisting of integral images for the images under consideration
+        '''
         positive_amt = np.sum(np.array([r.compute_area(integral_img) for r in self.positives]), axis=0)
         negative_amt = np.sum(np.array([r.compute_area(integral_img) for r in self.negatives]), axis=0)
         return positive_amt - negative_amt
         
 def compute_integral_img(imgs):
     '''
-    imgs is of shape (n, d_1, d_2)
+    computes the integral image from a given set of images using dynamic programming
+
+    Arguments:
+        imgs: array of shape (n, d_1, d_2) containing n images of size d_1 x d_2 each for which integral images must be computed
+
     '''
     n, d_1, d_2 = imgs.shape
     integral_imgs = np.zeros((n, d_1, d_2))
@@ -46,7 +84,16 @@ def compute_integral_img(imgs):
     return integral_imgs
 
 def feature_generator(img_dim, base_size=(5,5), scale_stride=1, stride=1):
-    scales = np.arange(1, img_dim//min(base_size), scale_stride)
+    '''
+    yeilds sets of 4 features at a time corresponding to the four Haar features in the V-J features starting from a given point at a given scale
+
+    Arguments:
+        img_dim: dimensions of the image for which features will be generated
+        base_size: size of the starting rectangle for each Haar feature
+        scale_stride: the amount by which to additively increase scales considered. should be an integer
+        stride: amount by which to move the rectangle over when outputing the features
+    '''
+    scales = np.arange(1, img_dim//min(base_size), int(scale_stride))
     for x_s in scales:
         for y_s in scales:
             start_pts_x = np.arange(0, img_dim, stride, dtype=int)
@@ -81,6 +128,24 @@ def feature_generator(img_dim, base_size=(5,5), scale_stride=1, stride=1):
 
 
 class V_J_weak:
+    '''
+    description: a weak predictor that uses exactly one Viola-Jones feature to classify the image
+
+    Attributes:
+        X: set of integral images
+        y: set of labels
+        feature: the feature used to make a classification
+        T: the threshold past which to consider something a positive sample
+        stride: amount to space the features apart on the image
+        scale_stride: amount by which to space the scales of features computed
+        score: performance of the threshold
+
+
+    Methods:
+        fit: fit a weak classifier using the training images and labels provided
+        predict: predict the output on new INTEGRAL images
+
+    '''
     def __init__(self, X, y, ft_stride=5, scale_stride=10):
         '''
         X is the set integral images
@@ -94,6 +159,14 @@ class V_J_weak:
         self.score = 0
 
     def fit(self, X, y, sample_weight=None):
+        '''
+        fit a weak classifier using the training images and labels provided
+
+        Arguments:
+            X: set of integral images
+            y: set of labels
+            sample_weight: relative weights of the samples (i.e., relative importance of getting a sample correct); defaults to None, in which case it is uniform.
+        '''
         n, img_dim, _ = X.shape
         feature_gen = feature_generator(img_dim, scale_stride=self.scale_stride, stride=self.stride)
         max_score = -np.inf
@@ -124,6 +197,15 @@ class V_J_weak:
     
     
 def find_and_score_threshold(class_1, class_2, wt_pos, wt_neg):
+    '''
+    finds and scores a single threshold for separating between two classes, weighted by the weighting of the samples.
+
+    Arguments:
+        class_1: value of feature for items in class 1
+        class_2: value of feature for items in class 2
+        wt_pos: weights for the samples in class 1 (i.e., relative importance of getting the samples correct)
+        wt_neg: weights for the samples in class 2 
+    '''
     min_pt = min(min(class_1), min(class_2))
     max_pt = max(max(class_1), max(class_2))    
     score = lambda T: (np.sum(np.multiply((class_1 > T), wt_pos)) + np.sum(np.multiply((class_2 < T),wt_neg)))/(np.sum(wt_pos) + np.sum(wt_neg))
@@ -135,10 +217,17 @@ def find_and_score_threshold(class_1, class_2, wt_pos, wt_neg):
 
 def extract_rights_wrongs(boosted_clf, processed_X_test, X_test, y_test, idx=None):
     '''
-    could either have this fn only handle the weak classifiers, or just write 
-    one fn with idx as an optional arg, and if it is not received, it will just run clf.predict
-    
-    takes in processed Xs for inference but also raw Xs to output
+    extracts the images on which a classifier is correct and wrong. The classifier 
+    considered is either the full boosted classifier (if idx = None) or the weak 
+    classifier at index idx.
+    it takes in processed Xs for inference but also raw Xs to output
+
+    Arguments:
+        boosted_clf: boosted classifier. must have .predict implemented and a .learned_clfs attribute that is a list
+        processed_X_test: integral images for the test images
+        X_test: images of the test images
+        y_test: labels of the test images
+        idx: index of the weak classifier to consider; defaults to None in which case the full boosted classifier is considered.
     '''
     if idx is not None:
         clf = boosted_clf.learned_clfs[idx]
@@ -155,6 +244,16 @@ def extract_rights_wrongs(boosted_clf, processed_X_test, X_test, y_test, idx=Non
 
 
 def plot_confusion_grid(wrong_faces, wrong_notfaces, right_faces, right_notfaces, title_string):
+    '''
+    plots a confusion grid of 4 of each of faces identified correctly, not faces identified correctly, 
+    faces identified incorrectly, and not faces identified incorrectly
+
+    Arguments:
+        wrong_faces: images of faces identified as not faces
+        wrong_notfaces: images of not faces identified as faces
+        right_faces: images of faces identified as faces
+        right_notfaces: images of not faces identified as not faces
+    '''
     f, axarr = plt.subplots(5,7, figsize=(14,10))#, gridspec_kw={'hspace': 0.1})
     f.tight_layout()
     for i in tqdm(range(5)):
