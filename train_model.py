@@ -96,7 +96,18 @@ def eval_model(dataloader, model, loss):
 	print(f"score: {score},\t average test loss: {avg_test_loss}")
 	return score, avg_test_loss
 
-def save_model(model, model_name, dataset, model_args, path):
+def save_model(model, model_name, dataset, path):
+	'''
+	saves model to path with name that includes the name of the model, the dataset, and the timestamp. 
+
+	##TODO: should this include optimizer, either in name or in arguments?
+
+	Arguments:
+		model: model to be saved. if it is not a torch model, it needs a function called "get_save_attributes()" that returns the dictionary to be saved
+		model_name (str): name of the model
+		dataset (str): name of the dataset that the model was trained on
+		path: location at which to save the model 
+	'''
 	## might make sense to save the model just using pytorch presets and then have a separate condition for the VJ with Boosting
 	timestamp = str(datetime.datetime.now())
 	save_name = f"{model_name}_{dataset}_{timestamp}.npy"
@@ -108,6 +119,10 @@ def save_model(model, model_name, dataset, model_args, path):
 		torch.save(model, os.path.join(path, save_name))
 
 def load_model(path):
+	'''
+	loads model from path if non-torch. requires model to hav
+	## todo: I think this is actually useless b/c the Torch ones need something different, and the Boosting one can be directly instantiated from path
+	'''
 	model_dict = np.load(path)
 
 	model = models.model_selector(model_dict["model constructor"], model_dict["model arguments"])
@@ -175,7 +190,6 @@ if __name__ == '__main__':
 		train_files, test_files = utils.train_test_split(args.data, n_sampes, include_classes=True)
 		X_train, y_train = utils.load_specified_files_from_path(args.data, train_files, img_dim=img_dim)
 		X_test, y_test = utils.load_specified_files_from_path(args.data, test_files, img_dim=img_dim)
-		# testloader = dataload.load_data_from_path(args.data, preproc, test_files)
 
 		phi_X = violajones.compute_integral_img(X_train)
 
@@ -186,10 +200,9 @@ if __name__ == '__main__':
 
 		yvj_test_predict = boosted_clf_vj.predict(test_phi_X)
 		# eval_model() can I use this here somehow?
-		# todo: compute test error, save model
 		test_accuracy = np.mean(y_test == yvj_test_predict)
 
-		save_model(model, args.model, dataset_name, model_args, save_path)
+		save_model(model, args.model, dataset_name, save_path)
 
 	else:
 
@@ -229,7 +242,7 @@ if __name__ == '__main__':
 
 		dataset_name = args.data.split('/')[-1]
 
-		save_model(model, args.model, dataset_name, model_args, save_path)
+		save_model(model, args.model, dataset_name, save_path)
 
 
 
