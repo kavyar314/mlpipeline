@@ -4,15 +4,43 @@ import numpy as np
 
 import matplotlib.pyplot as plt
 
+# def get_dict_attr(optimizer_args):
+# 	all_args = ["lr", "momentum", "train loss closure", "validation loss closure", "termination", "logs"]
+# 	lr, momentum, train_loss_fn, val_loss_fn, lr, termination, log_names = None, None, None, None, None, None, None
+# 	argument_vars = [lr, momentum, train_loss_fn, val_loss_fn, lr, termination, log_names]
+# 	set_args = []
+# 	for i, arg in enumerate(all_args):
+# 		if arg in optimizer_args:
+# 			set_args.append()
+# 	# I don't think this is going to work...
 
 def optimizer_selector(optimizer_name, optimizer_args):
+	'''
+	returns optimzer to use based on the name (string) and any arguments required for construction
+
+	Arguments:
+		optimizer_name: string describing which optimizer to use
+		optimizer_args: dictionary of required arguments for that optimizer (learning rate, momentum, etc)
+	'''
 	if optimizer_name == "torch_sgd":
 		return lambda modelparams: optim.SGD(modelparams,lr=optimizer_args["lr"], momentum=optimizer_args["momentum"])
+	elif optimizer_name == "logged_gd":
+		return lambda modelparams: LoggedGradientDescent(modelparams, optimizer_args['train loss closure'], 
+													optimizer_args['validation loss closure'], optimizer_args["path for custom"])
 	else:
 		return None # raise error here?
 
 
 class OptimizerInstanceFields():
+	'''
+	collects instance fields necessary for optimizer
+
+	Attributes:
+		train_losses: list of train losses over epochs
+		validation_losses: list of validation losses over epochs
+		epochs_transpired: number of epochs completed
+		last_update_norm: the norm of the most recent update to the weights
+	'''
 	def __init__(self):
 		self.train_losses = [np.inf]
 		self.validation_losses = [np.inf]
@@ -21,6 +49,18 @@ class OptimizerInstanceFields():
 
 
 class OptimizerTermination(OptimizerInstanceFields):
+	'''
+	class to specify termination condition
+
+	Attributes:
+		inherits from OptimizerInstanceFields
+
+	Methods:
+		loss_converge: checks if the loss of the most recent set of weights is small
+		averaged_losses_converge: checks if the smoothed losses converge
+		epochs_over: check if the desired number of epochs have finished
+		last_update_norm_small: checks if the most recent update to the weights has small norm
+	'''
 	def __init__(self):
 		super(OptimizerTermination, self).__init__()
 
@@ -36,7 +76,7 @@ class OptimizerTermination(OptimizerInstanceFields):
 		return appropriate_loss_converge
 
 	def averaged_losses_converge(self, losses, smoothing=3):
-		smoothed_losses = [np.mean(losses[i:i+3]) for i in range(len(losses)-2)]
+		smoothed_losses = [np.mean(losses[i:i+smoothing]) for i in range(len(losses)-smoothing+1)]
 		return self.loss_converge(smoothed_losses)
 
 	def epochs_over(self, limit_epochs):
@@ -70,7 +110,19 @@ class Logs(OptimizerInstanceFields):
 
 
 class LoggedGradientDescent(optim.Optimizer, OptimizerTermination, Logs):
-	def __init__(self, parameters, train_loss_fn, val_loss_fn=None, lr=0.001, termination=("train loss", 1e-4), log_names=[]):
+	'''
+	implements Gradient Descent as a pytorch optimizer that also has custom termination options and logs
+
+	Attributes:
+		inherits from OptimizerInstanceFields along with the additional ones below
+		termination_function: chooses the appropriate termination function
+		terminal_value: at what value of the desired parameter to terminate
+		logs: which logs to include
+		terminated: whether or not optimization is complete
+		train_loss_fn: function to compute train loss
+		val_loss_fn: function to compute validation loss
+	'''
+	def __init__(self, parameters, train_loss_fn, val_loss_fn, path_for_custom=None, lr=0.001, termination=("train loss", 1e-4), log_names=[]):
 		'''
 		termination: tuple of name of termination condition and 
 		train_loss_fn: closure that already incorporates train data
@@ -80,13 +132,21 @@ class LoggedGradientDescent(optim.Optimizer, OptimizerTermination, Logs):
 		optim.Optimizer.__init__(self, params=parameters, defaults={"lr": lr})
 		OptimizerTermination.__init__(self)
 		Logs.__init__(self)
-		## TODO: rest of init
-		self.termination_function = self.termination_selector(termination[0])
-		self.terminal_value = termination[1]
-		self.logs = [self.logs_selector(log_name) for log_name in log_names] # TODO: create a Log class that updates itself according to its instantiating function when .update() is called
-		self.terminated = False ## is it better to have an instance field for this or a function that calls the termination_function when called?
+		## train loss and validation loss functions need to be passed in, since they can only be instantiated after the data is loaded
 		self.train_loss_fn = train_loss_fn
 		self.val_loss_fn = val_loss_fn
+		self.terminated = False
+		if path_for_custom is not None:
+			spec = importlib.util.spec_from_file_location(path_for_custom, os.path.join("./", path_for_custom))
+			attributes = importlib.util.module_from_spec(spec)
+			spec.loader.exec_module(attributes)
+			self.termination_function = self.termination_selector(attributes.termination[0])
+			self.terminal_value = attributes.termination[1]
+			self.logs = [self.logs_selector(log_name) for log_name in attributes.log_names] # TODO: create a Log class that updates itself according to its instantiating function when .update() is called
+		else:
+			self.termination_function = self.termination_selector(termination[0])
+			self.terminal_value = termination[1]
+			self.logs = [self.logs_selector(log_name) for log_name in log_names] # TODO: create a Log class that updates itself according to its instantiating function when .update() is called
 
 		## TODO: check that: if logs includes val loss, then val_loss_fn is not None.
 
