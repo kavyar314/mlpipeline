@@ -7,6 +7,13 @@ from torchvision.io import ImageReadMode
 EXCLUDE = [".DS_Store"]
 
 def load_data_from_path(data_path, preproc, selector):
+	'''
+	returns an instance of the DatasetFromPath class
+
+	data_path: path to the data to be loaded. see comment for the class for filestructure under that path
+	preproc: a callable transformation to be applied to the image after loading
+	selector: list of files to use
+	'''
 	return DatasetFromPath(data_path, preproc, selector)
 
 class DatasetFromPath(Dataset):
@@ -27,6 +34,18 @@ class DatasetFromPath(Dataset):
 	    |__ img2.jpg
 	    |__ ...
 	|__ ...
+
+	Attributes:
+		classes: the set of classes in the path
+		class_dict: dictionary mapping from class number to class
+		ys: labels
+		xs: images
+		transform: callable transform
+		imgs_path: path from which images are loaded
+
+	Methods:
+		__len__: number of elements in the dataset
+		__getitem__: returns a single image and its label
 	'''
 	def __init__(self, path, transform, selector):
 		'''

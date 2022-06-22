@@ -10,10 +10,10 @@ def train_test_split(path, n_samples=None, split=0.8, include_classes=False):
 	'''
 	splits all the files found in the dataset into train and test splits
 
-	Arguments
-	path: path leading to the top-level directory consisting of: one subfolder per class, each containing all the images of that class
-	n_samples: None if all images are to be used for either train or test; number caps the total number in the train and test splits
-	split: proportion in [0, 1] to give to the training set. Defaults to 0.8
+	Arguments:
+		path: path leading to the top-level directory consisting of: one subfolder per class, each containing all the images of that class
+		n_samples: None if all images are to be used for either train or test; number caps the total number in the train and test splits
+		split: proportion in [0, 1] to give to the training set. Defaults to 0.8
 	'''
 	classes = [c for c in os.listdir(path) if c not in EXCLUDE]
 	files = []
@@ -32,9 +32,12 @@ def train_test_split(path, n_samples=None, split=0.8, include_classes=False):
 
 def load_specified_files_from_path(data_path, specs, img_dim=19):
 	'''
-	data_path: the path where the files live, with one subfolder for each class, inside which all the image files live
-	specs: list of filenames to load from data_path / class / fname
-	classes: list of classes associated with the files in specs
+	loads the paths specified in "specs" to images, makes the images greyscale, and resizes them to "img_dim"
+
+	Arguments:
+		data_path: the path where the files live, with one subfolder for each class, inside which all the image files live
+		specs: list of (fname, class) tuples to load from data_path / class / fname
+		img_dim: dimension to which to resize these images
 	'''
 	X = []
 	for fname, cname in specs:
@@ -46,8 +49,15 @@ def load_specified_files_from_path(data_path, specs, img_dim=19):
 
 
 
-def load_raw_data(data_path,pos_path="./data/faces_selected/", neg_path="./data/not_faces_selected/", cap_class=np.inf):
-	## TODO: make the signature less specific to the two classes etc
+def load_raw_data(pos_path="./data/faces_selected/", neg_path="./data/not_faces_selected/", cap_class=np.inf):
+	'''
+	loads positive and ngative data samples from path
+
+	Arguments:
+		pos_path: path to positive samples
+		neg_path: path to negative samples
+		cap_lcass: the number of samples per class to cap at. defaults to infinite
+	'''
     paths = [pos_path, neg_path]
     classes = os.lisd
     pos_img_path_list = os.listdir(pos_path)
@@ -71,6 +81,13 @@ def load_raw_data(data_path,pos_path="./data/faces_selected/", neg_path="./data/
     return [X_raw[i] for i in idxs], y[idxs] ## returns list of raw images and their labels
 
 def greyscale_and_resize(images, img_dim=64):
+	'''
+	takes in array of images and returns an array of the same images greyscaled and resized
+
+	Arguments:
+		images: array of images to preprocess
+		img_dim: the dimension to which to resize
+	'''
     output_images = []
     for img in tqdm(images):
         if len(img.shape)>2:
