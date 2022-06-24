@@ -4,6 +4,8 @@ import numpy as np
 from skimage.io import imread
 from skimage import transform
 
+from tqdm import tqdm
+
 EXCLUDE = ['.DS_Store']
 
 def train_test_split(path, n_samples=None, split=0.8, include_classes=False):
@@ -42,7 +44,7 @@ def load_specified_files_from_path(data_path, specs, img_dim=19):
 	X = []
 	for fname, cname in specs:
 		x = imread(os.path.join(os.path.join(data_path, cname), fname))
-		X.append(grey_scale_resize([x], img_dim))
+		X.append(greyscale_and_resize([x], img_dim))
 	classes = [s[1] for s in specs]
 	class_numbers = dict(zip(list(set(classes)), range(len(set(classes)))))
 	return np.array(X), [class_numbers[c] for c in classes]
@@ -58,27 +60,27 @@ def load_raw_data(pos_path="./data/faces_selected/", neg_path="./data/not_faces_
 		neg_path: path to negative samples
 		cap_lcass: the number of samples per class to cap at. defaults to infinite
 	'''
-    paths = [pos_path, neg_path]
-    classes = os.lisd
-    pos_img_path_list = os.listdir(pos_path)
-    neg_img_path_list = os.listdir(neg_path)
-    np.random.shuffle(pos_img_path_list)
-    np.random.shuffle(neg_img_path_list)
-    positives = []
-    negatives = []
-    img_types = [positives, negatives]
-    for i, img_list in enumerate([pos_img_path_list, neg_img_path_list]):
-        for j, img_fname in tqdm(enumerate(img_list)):
-            if img_fname == ".DS_Store":
-                continue
-            if j > cap_class:
-                break
-            img = mpimg.imread(os.path.join(paths[i], img_fname))
-            img_types[i].append(img)
-    y = np.hstack((np.ones(len(positives)), -np.ones(len(negatives))))
-    X_raw = positives + negatives
-    idxs = np.random.permutation(range(y.shape[0]))
-    return [X_raw[i] for i in idxs], y[idxs] ## returns list of raw images and their labels
+	paths = [pos_path, neg_path]
+	classes = os.lisd
+	pos_img_path_list = os.listdir(pos_path)
+	neg_img_path_list = os.listdir(neg_path)
+	np.random.shuffle(pos_img_path_list)
+	np.random.shuffle(neg_img_path_list)
+	positives = []
+	negatives = []
+	img_types = [positives, negatives]
+	for i, img_list in enumerate([pos_img_path_list, neg_img_path_list]):
+		for j, img_fname in tqdm(enumerate(img_list)):
+			if img_fname == ".DS_Store":
+				continue
+			if j > cap_class:
+				break
+			img = mpimg.imread(os.path.join(paths[i], img_fname))
+			img_types[i].append(img)
+	y = np.hstack((np.ones(len(positives)), -np.ones(len(negatives))))
+	X_raw = positives + negatives
+	idxs = np.random.permutation(range(y.shape[0]))
+	return [X_raw[i] for i in idxs], y[idxs] ## returns list of raw images and their labels
 
 def greyscale_and_resize(images, img_dim=64):
 	'''
@@ -88,12 +90,12 @@ def greyscale_and_resize(images, img_dim=64):
 		images: array of images to preprocess
 		img_dim: the dimension to which to resize
 	'''
-    output_images = []
-    for img in tqdm(images):
-        if len(img.shape)>2:
-            grey_scale_img = np.mean(img, axis=2)
-        else:
-            grey_scale_img = img
-        same_size_img = transform.resize(grey_scale_img, (img_dim, img_dim))
-        output_images.append(same_size_img)
-    return np.array(output_images)
+	output_images = []
+	for img in tqdm(images):
+		if len(img.shape)>2:
+			grey_scale_img = np.mean(img, axis=2)
+		else:
+			grey_scale_img = img
+		same_size_img = transform.resize(grey_scale_img, (img_dim, img_dim))
+		output_images.append(same_size_img)
+	return np.array(output_images)
