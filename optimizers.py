@@ -151,7 +151,7 @@ class LoggedBatchGradientDescent(optim.Optimizer, OptimizerTermination, Logs):
 			self.termination_function = self.termination_selector(termination[0])
 			self.terminal_value = termination[1]
 			self.logs = [self.logs_selector(log_name) for log_name in log_names] # TODO: create a Log class that updates itself according to its instantiating function when .update() is called
-		## train loss and validation loss functions need to be passed in, since they can only be instantiated after the data is loaded
+
 		self.train_loss_fn = train_loss_fn
 		self.val_loss_fn = val_loss_fn
 		self.terminated = False
@@ -161,7 +161,6 @@ class LoggedBatchGradientDescent(optim.Optimizer, OptimizerTermination, Logs):
 			print("cannot log validation loss without a validation loss function")
 			self.logs.pop(log_names.index("val_loss"))
 
-		## TODO: check that: if logs includes val loss, then val_loss_fn is not None.
 
 	def set_train_loss_fn(self, train_loss_fn):
 		self.train_loss_fn = train_loss_fn
