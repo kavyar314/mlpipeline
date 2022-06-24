@@ -64,3 +64,5 @@ Optimizers must have a `.step()` method implemented as in Pytorch.
 
 
 ## Extensions
+
+So far, this platform only has a handful of options implemented for each modular part, but this can be very easily extended. For models and optimizers, simply implement the respective model or optimizer desired and then add it to the respective selector `model_selector` or `optimizer_selector`. Alternate termination conditions can also be added to the class `OptimizerTermination` in the `optimizers.py` file for alternate options.
