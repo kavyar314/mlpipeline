@@ -1,4 +1,5 @@
 # mlpipeline
+By Kavya Ravichandran
 
 This document describes how to use this software and also serves as the report for the Programming Requirement.
 
@@ -36,6 +37,8 @@ The following are some specific examples:
 ## Requirements
 
 ### data
+
+*I can send the data if needed via email or DropBox*
 
 * top-level directory has the name of the dataset
     * each sub-directory matches the name of a class
