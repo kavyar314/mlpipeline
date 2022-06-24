@@ -57,13 +57,16 @@ def custom_train_loop(dataloader, model, loss, optimizer, print_freq=1):
 		print_freq: how often to log the loss.
 	'''
 	# runs with a while loop -- add a "terminate" flag in optimizer and check it each time
-	while optimizer.terminated is false:
-		print("training: epoch %d" % i)
+	epoch_number = 0
+	while optimizer.terminated is False:
+		optimizer.set_epoch_number(epoch_number)
+		print("training: epoch %d" % epoch_number)
 		epoch_loss = 0
 		# take actions
 		for (X,y) in dataloader:
 			preds = model(X)
 			loss_param = loss(preds, y)
+			optimizer.set_train_loss_fn(lambda: loss_param)
 			
 			loss_param.backward()
 			optimizer.step()
@@ -71,7 +74,9 @@ def custom_train_loop(dataloader, model, loss, optimizer, print_freq=1):
 			loss_val = loss_param.item() * X.shape[0]
 			epoch_loss += loss_val
 		avg_epoch_loss = epoch_loss / len(dataloader.dataset)
-		print(f"training loss at epoch {i}: {avg_epoch_loss}")
+		print(f"training loss at epoch {epoch_number}: {avg_epoch_loss}")
+		epoch_number += 1
+	print(optimizer.step_count)
 
 def eval_model(dataloader, model, loss):
 	'''
@@ -181,13 +186,13 @@ if __name__ == '__main__':
 		# run Boosting with V-J weak classifiers
 		# score on test set
 		# save model
-		if not (os.path.isdir("./vj-data/faces") and os.path.isdir("./vj-data/not_faces")):
+		if not (os.path.isdir(os.path.join(args.data, "faces")) and os.path.isdir(os.path.join(args.data, "not_faces"))):
 			print("data not available")
-			return
+			# return Raise Error
 		if img_dim is None or n_learners is None:
 			print("use config that allows for V-J")
-			return
-		train_files, test_files = utils.train_test_split(args.data, n_sampes, include_classes=True)
+			# return Raise Error
+		train_files, test_files = utils.train_test_split(args.data, n_samples, include_classes=True)
 		X_train, y_train = utils.load_specified_files_from_path(args.data, train_files, img_dim=img_dim)
 		X_test, y_test = utils.load_specified_files_from_path(args.data, test_files, img_dim=img_dim)
 
@@ -213,7 +218,6 @@ if __name__ == '__main__':
 		# make train / test split
 		train_files, test_files = utils.train_test_split(args.data, n_samples)
 
-		## todo: implement class that extends Dataset so can use in DataLoader
 		train_dataset = dataload.load_data_from_path(args.data, preproc, train_files)
 		test_dataset = dataload.load_data_from_path(args.data, preproc, test_files)
 
@@ -223,6 +227,15 @@ if __name__ == '__main__':
 
 		loss = losses.loss_selector(args.loss, loss_args)
 		model = models.model_selector(args.model, model_args)
+		if "torch" not in args.optimizer and "path for custom" not in optimizer_args:
+			print("custom optimizer requires custom config")
+			# Raise Error
+
+		## maybe fix this by loading some files from path using the util function and -- ah this doesn't work b/c this is what is used to optimize
+		## need to add flag to catch logged_gd and preload all the data into an array
+		loss_closure = None #lambda: loss(model(X),y)
+		optimizer_args["train loss closure"] = loss_closure
+		optimizer_args["validation loss closure"] = None # Not yet supported
 		optimizer = optimizers.optimizer_selector(args.optimizer, optimizer_args)(model.parameters()) 
 
 		if VERBOSE:
