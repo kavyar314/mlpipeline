@@ -47,7 +47,7 @@ def load_specified_files_from_path(data_path, specs, img_dim=19):
 		X.append(greyscale_and_resize([x], img_dim))
 	classes = [s[1] for s in specs]
 	class_numbers = dict(zip(list(set(classes)), range(len(set(classes)))))
-	return np.array(X), [class_numbers[c] for c in classes]
+	return np.squeeze(X), [class_numbers[c] for c in classes]
 
 
 

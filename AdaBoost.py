@@ -78,7 +78,7 @@ class AdaBoost():
 		Arguments:
 			X: test data as integral images
 		'''
-		return np.sum(np.array([self.classifier_weights[i]*self.classifiers[i].predict(X) for i in range(len(self.classifier_weights))]), axis=) #TODO: axis
+		return np.sum(np.array([self.classifier_weights[i]*self.classifiers[i].predict(X) for i in range(len(self.classifier_weights))]), axis=0) 
 
 	def get_save_attributes(self):
 		'''

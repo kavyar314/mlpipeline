@@ -1,3 +1,8 @@
+import numpy as np
+from tqdm import tqdm
+
+import matplotlib.pyplot as plt
+
 # Next two classes adapted from https://github.com/salvacarrion/viola-jones
 class Rectangle:
     '''

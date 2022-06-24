@@ -7,6 +7,7 @@ import utils
 import models
 import optimizers
 import violajones
+from AdaBoost import AdaBoost
 
 import torch
 
@@ -179,6 +180,8 @@ if __name__ == '__main__':
 	except:
 		n_learners = None
 
+	dataset_name = args.data.split('/')[-1]
+
 	if args.preproc == "VJ" and args.optimizer == "Boosting":
 		## handle this case separately
 		# load data into files
@@ -195,19 +198,22 @@ if __name__ == '__main__':
 		train_files, test_files = utils.train_test_split(args.data, n_samples, include_classes=True)
 		X_train, y_train = utils.load_specified_files_from_path(args.data, train_files, img_dim=img_dim)
 		X_test, y_test = utils.load_specified_files_from_path(args.data, test_files, img_dim=img_dim)
-
+		
+		# print(X_train.shape)
+		
 		phi_X = violajones.compute_integral_img(X_train)
 
 		boosted_clf_vj = AdaBoost(violajones.V_J_weak, n_learners=n_learners)
 		boosted_clf_vj.fit(phi_X, y_train)
 
-		test_phi_X = compute_integral_img(X_test)
+
+		test_phi_X = violajones.compute_integral_img(X_test)
 
 		yvj_test_predict = boosted_clf_vj.predict(test_phi_X)
 		# eval_model() can I use this here somehow?
 		test_accuracy = np.mean(y_test == yvj_test_predict)
 
-		save_model(model, args.model, dataset_name, save_path)
+		save_model(boosted_clf_vj, args.model, dataset_name, save_path)
 
 	else:
 
@@ -253,7 +259,6 @@ if __name__ == '__main__':
 
 		score, test_loss = eval_model(testloader, model, loss)
 
-		dataset_name = args.data.split('/')[-1]
 
 		save_model(model, args.model, dataset_name, save_path)
 
