@@ -1,6 +1,8 @@
 import torch.optim as optim
 import torch
 import numpy as np
+import importlib
+import os
 
 import matplotlib.pyplot as plt
 
@@ -24,8 +26,8 @@ def optimizer_selector(optimizer_name, optimizer_args):
 	'''
 	if optimizer_name == "torch_sgd":
 		return lambda modelparams: optim.SGD(modelparams,lr=optimizer_args["lr"], momentum=optimizer_args["momentum"])
-	elif optimizer_name == "logged_gd":
-		return lambda modelparams: LoggedGradientDescent(modelparams, optimizer_args['train loss closure'], 
+	elif optimizer_name == "logged_bgd":
+		return lambda modelparams: LoggedBatchGradientDescent(modelparams, optimizer_args['train loss closure'], 
 													optimizer_args['validation loss closure'], optimizer_args["path for custom"])
 	else:
 		return None # raise error here?
@@ -109,7 +111,7 @@ class Logs(OptimizerInstanceFields):
 
 
 
-class LoggedGradientDescent(optim.Optimizer, OptimizerTermination, Logs):
+class LoggedBatchGradientDescent(optim.Optimizer, OptimizerTermination, Logs):
 	'''
 	implements Gradient Descent as a pytorch optimizer that also has custom termination options and logs
 
@@ -128,27 +130,41 @@ class LoggedGradientDescent(optim.Optimizer, OptimizerTermination, Logs):
 		train_loss_fn: closure that already incorporates train data
 		val_loss_fn: closure that already incorporates val data
 		'''
-		# need kwargs to handle `plot` variable for Logs
-		optim.Optimizer.__init__(self, params=parameters, defaults={"lr": lr})
+		# need kwargs to handle `plot` variable for Logs -- actually I think it's better to just have a separate plotting wrapper for the log
 		OptimizerTermination.__init__(self)
 		Logs.__init__(self)
+		if path_for_custom is not None and path_for_custom != "":
+			spec = importlib.util.spec_from_file_location(path_for_custom, os.path.join("./", path_for_custom))
+			attributes = importlib.util.module_from_spec(spec)
+			spec.loader.exec_module(attributes)
+			try:
+				lr = attributes.lr
+			except:
+				lr = lr
+			optim.Optimizer.__init__(self, params=parameters, defaults={"lr": lr})
+			self.termination_function = self.termination_selector(attributes.termination[0])
+			self.terminal_value = attributes.termination[1]
+			log_names = attributes.log_names
+			self.logs = [self.logs_selector(log_name) for log_name in log_names] # TODO: create a Log class that updates itself according to its instantiating function when .update() is called
+		else:
+			optim.Optimizer.__init__(self, params=parameters, defaults={"lr": lr})
+			self.termination_function = self.termination_selector(termination[0])
+			self.terminal_value = termination[1]
+			self.logs = [self.logs_selector(log_name) for log_name in log_names] # TODO: create a Log class that updates itself according to its instantiating function when .update() is called
 		## train loss and validation loss functions need to be passed in, since they can only be instantiated after the data is loaded
 		self.train_loss_fn = train_loss_fn
 		self.val_loss_fn = val_loss_fn
 		self.terminated = False
-		if path_for_custom is not None:
-			spec = importlib.util.spec_from_file_location(path_for_custom, os.path.join("./", path_for_custom))
-			attributes = importlib.util.module_from_spec(spec)
-			spec.loader.exec_module(attributes)
-			self.termination_function = self.termination_selector(attributes.termination[0])
-			self.terminal_value = attributes.termination[1]
-			self.logs = [self.logs_selector(log_name) for log_name in attributes.log_names] # TODO: create a Log class that updates itself according to its instantiating function when .update() is called
-		else:
-			self.termination_function = self.termination_selector(termination[0])
-			self.terminal_value = termination[1]
-			self.logs = [self.logs_selector(log_name) for log_name in log_names] # TODO: create a Log class that updates itself according to its instantiating function when .update() is called
+		self.step_count = 0
+
+		if "val_loss" in log_names and self.val_loss_fn is None:
+			print("cannot log validation loss without a validation loss function")
+			self.logs.pop(log_names.index("val_loss"))
 
 		## TODO: check that: if logs includes val loss, then val_loss_fn is not None.
+
+	def set_train_loss_fn(self, train_loss_fn):
+		self.train_loss_fn = train_loss_fn
 
 	@torch.no_grad()
 	def step(self, closure=None):
@@ -183,6 +199,8 @@ class LoggedGradientDescent(optim.Optimizer, OptimizerTermination, Logs):
 
 		self.train_losses.append(losses[0])
 
+		self.step_count += 1
+
 		return losses
 
 	def has_terminated(self):
@@ -204,6 +222,9 @@ class LoggedGradientDescent(optim.Optimizer, OptimizerTermination, Logs):
 			return self.epochs_over
 		if termination_name == "small last update":
 			return self.last_update_norm_small
+
+	def set_epoch_number(self, n):
+		self.epochs_transpired = n
 
 
 def gd(params, d_params, lr, has_sparse_gradient):
