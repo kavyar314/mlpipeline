@@ -14,7 +14,7 @@ def loss_selector(loss_name, arguments=None):
 
 
 
-class square_loss(Module): ## should this be _Loss? -- do I have to worry about autograd?
+class square_loss(Module):
 	def __init__(self):
 		super(square_loss, self).__init__()
 
