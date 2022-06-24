@@ -8,7 +8,7 @@ This pipeline exists to facilitate easy training and evaluation of machine learn
 
 ## Training Models
 
-First, set up a config file with the following attributes:
+First, set up a config file with the following attributes if using a neural network:
 * `batch_size`
 * `loss_args`
 * `model_args`
@@ -16,6 +16,8 @@ First, set up a config file with the following attributes:
 * `n_epochs`
 * `save_path`
 * `preproc`
+
+or `img_dim` and `n_learners` if you are using Viola Jones and AdaBoost.
 
 See `config.py` as an example. Note that if you intend to use a custom optimizer, you may need to provide an optimizer config file through the field `path for custom` in the `optimizer_args` variable. That would include the learning rate, the termination type and terminal value, and the names of the logs to use. 
 
@@ -29,6 +31,7 @@ The basic command for training models involves running a command line script:
 The following are some specific examples:
 * `python train_model.py --data ./sample_data --model vgg16 --loss torch_ce  --optimizer torch_sgd --config config.py`
 * `python train_model.py --data ./sample_data --model vgg16 --loss torch_ce  --optimizer logged_gd --config config.py`
+* `python train_model.py --data ./sample_data --preproc VJ --model none  --loss none  --optimizer Boosting --config config.py`
 
 ## Requirements
 
